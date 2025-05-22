@@ -1,37 +1,51 @@
 ﻿using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace AudioControl;
-
-// https://chatgpt.com/c/6825dd54-0abc-8006-a55c-96e78d5fce76
-
 public class Esp32Client
 {
     private readonly HttpClient _http;
-    private readonly string _baseUrl;
 
-    public Esp32Client(string baseUrl)
+    public string BaseUrl => AppSettings.Esp32Ip;
+    private string ApiUrl => $"{BaseUrl.TrimEnd('/')}/api";
+
+    public Esp32Client()
     {
         _http = new HttpClient();
-        _baseUrl = baseUrl.TrimEnd('/');
     }
 
-    private async Task<ApiResponse?> SendCommandAsync<T>(T command)
+    public Task<CommandResult> MuteAsync() =>
+        SendCommandAsync(new { cmd = "mute" });
+
+    public Task<CommandResult> UnmuteAsync() =>
+        SendCommandAsync(new { cmd = "unmute" });
+
+    public Task<CommandResult> SetVolumeAsync(byte level) =>
+        SendCommandAsync(new { cmd = "set_volume", level });
+
+    private async Task<CommandResult> SendCommandAsync(object command)
     {
-        var json = JsonSerializer.Serialize(command);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        try
+        {
+            var json = JsonSerializer.Serialize(command);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await _http.PostAsync($"{_baseUrl}/api", content);
-        response.EnsureSuccessStatusCode();
+            var response = await _http.PostAsync(ApiUrl, content);
 
-        var body = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<ApiResponse>(body);
+            if (!response.IsSuccessStatusCode)
+                return CommandResult.Failure($"HTTP {response.StatusCode}");
+
+            var responseText = await response.Content.ReadAsStringAsync();
+            var commandResponse = JsonSerializer.Deserialize<CommandResponse>(responseText);
+
+            return CommandResult.Success(commandResponse);
+        }
+        catch (Exception ex)
+        {
+            return CommandResult.Failure(ex.Message);
+        }
     }
-
-    public Task<ApiResponse?> MuteAsync() => SendCommandAsync(new MuteCommand());
-    public Task<ApiResponse?> UnmuteAsync() => SendCommandAsync(new UnmuteCommand());
-    public Task<ApiResponse?> SetVolumeAsync(int level) =>
-        SendCommandAsync(new SetVolumeCommand { Level = level });
 }
