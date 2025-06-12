@@ -9,9 +9,14 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly Esp32Client _client = new();
 
-    [ObservableProperty] private bool isBusy;
-    [ObservableProperty] private string statusMessage = "Bereit";
-    [ObservableProperty] private double volumeLevel = 50;
+    [ObservableProperty]
+    public partial bool IsBusy { get; set; }
+
+    [ObservableProperty]
+    public partial string StatusMessage { get; set; } = "Bereit";
+
+    [ObservableProperty]
+    public partial double VolumeLevel { get; set; } = 50;
 
     public MainViewModel()
     {
